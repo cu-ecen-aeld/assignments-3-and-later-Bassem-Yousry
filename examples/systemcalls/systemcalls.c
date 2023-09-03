@@ -1,4 +1,11 @@
 #include "systemcalls.h"
+#include <sys/wait.h>
+#include <stdlib.h>
+       #include <sys/types.h>
+       #include <unistd.h>
+#include<fcntl.h>
+
+#define _XOPEN_SOURCE
 
 /**
  * @param cmd the command to execute with system()
@@ -9,7 +16,7 @@
 */
 bool do_system(const char *cmd)
 {
-
+int ret;
 /*
  * TODO  add your code here
  *  Call the system() function with the command set in the cmd
@@ -17,6 +24,10 @@ bool do_system(const char *cmd)
  *   or false() if it returned a failure
 */
 
+ret =  system(cmd);
+if (ret==-1){return false;}
+if(! WIFEXITED(ret) )
+return false;
     return true;
 }
 
@@ -57,9 +68,14 @@ bool do_exec(int count, ...)
  *   (first argument to execv), and use the remaining arguments
  *   as second argument to the execv() command.
  *
-*/
+*/    va_end(args);
+int ret,status;
+if(!(ret=fork())){execv(command[0],command+1);exit(0);}
+else{
+if (waitpid(ret,&status,0)==-1){return false;}
+}
 
-    va_end(args);
+if ( ! WIFEXITED (status)){return false;}
 
     return true;
 }
@@ -92,8 +108,30 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *   The rest of the behaviour is same as do_exec()
  *
 */
+int ret,status;
+   int fd;
+
+   fd =open(outputfile,O_WRONLY | O_CREAT | O_TRUNC,
+S_IWUSR | S_IRUSR | S_IWGRP | S_IRGRP | S_IROTH);
+if(!(ret=fork())){execv(command[0],command+1);
+    dup2(fd, 1) ; 
+
+exit(0);}
+else{
+if (waitpid(ret,&status,0)==-1){return false;}
+}
+
+if ( ! WIFEXITED (status)){return false;}
+
+    return true;
+
+
 
     va_end(args);
 
     return true;
 }
+int main(){
+printf("%d\n",do_system("ls"));
+
+return 0;}
