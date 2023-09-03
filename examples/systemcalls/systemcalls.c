@@ -63,23 +63,42 @@ bool do_exec(int count, ...)
     // and may be removed
     command[count] = command[count];
 
-/*
- * TODO:
- *   Execute a system command by calling fork, execv(),
- *   and wait instead of system (see LSP page 161).
- *   Use the command[0] as the full path to the command to execute
- *   (first argument to execv), and use the remaining arguments
- *   as second argument to the execv() command.
- *
-*/    va_end(args);
-int ret,status;
-if(!(ret=fork())){execv(command[0],command+1);exit(0);}
-else{
-if (waitpid(ret,&status,0)==-1){return false;}
-}
 
-if ( ! WIFEXITED (status)){return false;}
+  int status;
+    pid_t pid;
+    int rt;
 
+    //create a child process
+    pid = fork();
+
+    //fork fail condition
+    if(pid == -1){
+        perror("fork error");
+        return false;
+    }
+    else if(pid == 0){//Child process
+        
+        rt = execv(command[0],command);
+        if(rt == -1){
+            perror("execv error");
+            exit(-1); //same as false
+        }
+
+    }else{ //Parent process
+
+        //wait for child process exit
+        if(waitpid(pid,&status,0) == -1){
+            perror("wait error");
+            return false;
+        }
+        
+        //check exit status after wait
+        if( ! (WIFEXITED(status)) || WEXITSTATUS(status)){
+            perror("wait error");
+            return false;
+        }
+    }
+va_end(args);
     return true;
 }
 
@@ -111,30 +130,47 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *   The rest of the behaviour is same as do_exec()
  *
 */
-int ret,status;
+    int status;
+    pid_t pid;
+    int rt;
    int fd;
 
    fd =open(outputfile,O_WRONLY | O_CREAT | O_TRUNC,
 S_IWUSR | S_IRUSR | S_IWGRP | S_IRGRP | S_IROTH);
-if(!(ret=fork())){execv(command[0],command+1);
-    dup2(fd, 1) ; 
 
-exit(0);}
-else{
-if (waitpid(ret,&status,0)==-1){return false;}
-}
+    pid = fork();
 
-if ( ! WIFEXITED (status)){return false;}
+    //fork fail condition
+    if(pid == -1){
+        perror("fork error");
+        return false;
+    }
+    else if(pid == 0){//Child process
+        dup2(fd,1);
+        rt = execv(command[0],command);
+        if(rt == -1){
+            perror("execv error");
+            exit(-1); //same as false
+        }
 
-    return true;
+    }else{ //Parent process
 
+        //wait for child process exit
+        if(waitpid(pid,&status,0) == -1){
+            perror("wait error");
+            return false;
+        }
+        
+        //check exit status after wait
+        if( ! (WIFEXITED(status)) ){
+            perror("wait error");
+            return false;
+        }
+    }
 
 
     va_end(args);
 
     return true;
 }
-int main(){
-printf("%d\n",do_system("ls"));
 
-return 0;}
